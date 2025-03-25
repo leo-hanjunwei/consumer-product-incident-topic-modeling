@@ -1,0 +1,1469 @@
+---
+title: "North America Consumer Product Data Cleaning"
+author: "Hanjun Wei"
+date: '2022-06-15'
+output: html_document
+---
+
+```{r setup, include=FALSE,include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, message=FALSE}
+library(tidyverse)
+library(epiDisplay)
+```
+### Loading Data set 
+
+##### Loading Canada Data set
+
+```{r, echo=FALSE, message=FALSE,include=FALSE}
+Canada_original = read.csv("../../Data/Raw_Data/Heath_Canada/Canada_Consumer_Product_Incidents_2011_2019.csv")
+dim(Canada_original)
+```
+Dimension of Canada Data set is 20222 observations with 33 features. 
+
+##### Loading US Data set (Clearing House Data)
+
+```{r, echo=FALSE, message=FALSE,include=FALSE}
+## Loading  data set between 2012 to 2019
+
+# 2012
+CH_2012 = read.csv("../../Data/Raw_Data/Clearing_House/Clearinghouse Data 2012.csv")
+
+# 2013
+CH_2013 = read.csv("../../Data/Raw_Data/Clearing_House/Clearinghouse Data 2013.csv")
+
+# 2014
+CH_2014 = read.csv("../../Data/Raw_Data/Clearing_House/Clearinghouse Data 2014.csv")
+
+# 2015
+CH_2015 = read.csv("../../Data/Raw_Data/Clearing_House/Clearinghouse Data 2015.csv")
+
+# 2016
+CH_2016 = read.csv("../../Data/Raw_Data/Clearing_House/Clearinghouse Data 2016.csv")
+
+# 2017
+CH_2017 = read.csv("../../Data/Raw_Data/Clearing_House/Clearinghouse Data 2017.csv")
+
+# 2018
+CH_2018 = read.csv("../../Data/Raw_Data/Clearing_House/Clearinghouse Data 2018.csv")
+
+# 2019
+CH_2019 = read.csv("../../Data/Raw_Data/Clearing_House/Clearinghouse Data 2019.csv")
+
+# show 
+#head(CH_2019)
+
+## Combine Clearing House Data set
+CH_original = rbind(CH_2012,CH_2013,CH_2014,CH_2015,CH_2016,CH_2017,CH_2018,CH_2019)
+
+dim(CH_original)
+```
+
+
+Dimension of Clearing House Data set is 194,474 observations with 33 features.
+
+For your information, the population for Canada and the United States in 2022 are:
+
+- Canada 38,390,075
+- us 331,893,745
+
+
+
+
+
+
+
+
+## Variable Invastigation
+
+By investigation, there are 7 features that both data sets have in common: 
+
+- ID
+- Product (product code)
+- Injury
+- Severity
+- Body Part
+- Hazard, and 
+- Narrative.
+
+##### ID (Checked)
+################################################################################# ID ###########################################################################################
+
+
+Feature summary:
+
+```{r, echo=FALSE, include=FALSE}
+CH = CH_original
+Canada = Canada_original
+
+# CH
+print("CH:")
+c("Number of ID",length(CH$INCIDENT.ID))
+c("Number of Unique ID", length(unique(CH$INCIDENT.ID)))
+
+# Canada
+print("Canada:")
+c("Number of ID",length(Canada$Case.Number))
+c("Number of Unique ID", length(unique(Canada$Case.Number)))
+  # Not unique
+c("Duplicated ID", Canada$Case.Number[duplicated(Canada$Case.Number)])
+  # Show Duplicated Observations
+Canada[Canada$Case.Number == "2020-012663",]
+  # Remove the duplication (the first observation)
+Canada = Canada[-c(20159), ]
+  # After remove Duplication
+Canada[Canada$Case.Number == "2020-012663",]
+  # Dimension
+dim(Canada)
+```
+for Clearing House Data set:
+
+- Number of ID is: 194474    
+- Number of Unique ID is: 194474         
+
+for Canada data set:
+
+- Number of ID is:20222     
+- Number of Unique ID is: 20221        
+- Duplicated ID is: 2020-012663
+
+
+Among Canada, there is a duplicated case, the duplicate case ID number is `2020-012663`. We will only keep one observation from the two duplicated cases (remove `20159`).
+
+
+```{r, echo=FALSE}
+# CH
+print("CH:")
+c("Number of ID",length(CH$INCIDENT.ID))
+c("Number of Unique ID", length(unique(CH$INCIDENT.ID)))
+
+# Canada
+print("Canada:")
+c("Number of ID",length(Canada$Case.Number))
+c("Number of Unique ID", length(unique(Canada$Case.Number)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+
+##### Product (product Numerical code) (Checked)
+################################################################################# Product #################################################################################
+
+
+Feature summary:
+
+```{r, echo=FALSE, include=FALSE}
+# CH
+print("CH:")
+c("Number of product",length(CH$PRODUCT.1))
+c("Number of Unique product", length(unique(CH$PRODUCT.1)))
+
+# Canada
+print("Canada:")
+c("Number of product",length(Canada$Product.Category.1))
+c("Number of Unique product", length(unique(Canada$Product.Category.1)))
+```
+
+
+for Clearing House Data set:
+
+- Number of product is: 194474    
+- Number of Unique product is: 763         
+
+for Canada data set:
+
+- Number of product is:20221     
+- Number of Unique product is: 631
+
+We will only keep the four digit numerical product ID in our data set.
+
+###### Product code for clearing house data set:
+
+Among all incident product in the clearing house data set there is `1` product without numerical code, this product is:
+
+
+```{r, echo=FALSE}
+# generate product number code for **CH**:
+product_CH = CH$PRODUCT.1
+
+r = regexpr("([0-9]+)", product_CH)
+
+# length before reg
+#length(product_CH)
+
+# length after reg
+#length((regmatches(product_CH,r)))
+
+# Uncode product
+product_CH[!grepl("([0-9]+)", product_CH)][1]
+```
+From the code book (NEISS Coding Manual), we found the product code for "Drywall in a Completed Structure" is `1897`.
+ 
+```{r,echo=FALSE}
+# assign correct code for uncode product
+product_CH[!grepl("([0-9]+)", product_CH)] = paste("Drywall in a Completed Structure", "(1897)")
+
+# length before reg
+length(product_CH)
+
+# length after reg
+r = regexpr("([0-9]+)", product_CH)
+length((regmatches(product_CH,r)))
+
+# add zero to four digit code
+CH$Product_Code = regmatches(product_CH,r)
+for (i in 1:length(CH$Product_Code)){
+  if (nchar(CH$Product_Code[i])<4){
+    while(nchar(CH$Product_Code[i])<4){
+      CH$Product_Code[i]= paste0("0",CH$Product_Code[i])
+      }
+  }
+}
+
+```
+
+After reorganize the product code. We can see the first 10 examples of four digit product code are listed as follow:
+
+```{r,echo=FALSE}
+CH$Product_Code[1:10]
+## check if all code are four digit number
+#sum(nchar(CH$Product_Code)!=4)
+```
+
+
+###### product code for Canada data set:
+
+product labels that missing a numerical product code:
+
+```{r, echo=FALSE}
+# Product labels missing numerical label
+product_Canada = Canada$Product.Category.1
+unique(product_Canada[!grepl("[0-9]+", product_Canada)])
+```
+
+Total number of observations that missing a product code:
+
+```{r, echo=FALSE}
+r = regexpr("[0-9]+", product_Canada)
+# number of obs. that missing product code
+length(product_Canada) - length((regmatches(product_Canada,r)))
+```
+
+number of observations respect to individual product label that missing a product code:
+
+```{r, echo=FALSE}
+# label 1
+sum(product_Canada == "")
+
+# label 2
+sum(product_Canada == "HC-NEISS > Miscellaneous > other products/other department")
+# label 3
+sum(product_Canada == "HC-NEISS > Household Items > other household items")
+# label 4
+sum(product_Canada == "HC-NEISS > Household Items > appliances - small")
+# label 5
+sum(product_Canada == "HC-NEISS > Modifiers > Second Hand")
+# label 6
+sum(product_Canada == "HC-NEISS > Miscellaneous > other second-hand products")
+# label 7
+sum(product_Canada == "HC-NEISS > Household Items > appliances - large")
+# label 8
+sum(product_Canada == "HC-NEISS > Childcare > other childcare items")
+# label 9
+sum(product_Canada == "HC-NEISS > Miscellaneous > Vaping Device")
+# label 10
+sum(product_Canada == "HC-NEISS > Chemicals > Marine chemicals (excluding antifreeze, lubricants, waxes and windshield wiper fluids)")
+# label 11
+sum(product_Canada == "HC-NEISS > Household Textiles > other household textile items")
+# label 12
+sum(product_Canada == "HC-NEISS > Chemicals > cleaners - wood, incl bleaches")
+# label 13
+sum(product_Canada == "HC-NEISS > Sports/Leisure > Bicycles or accessories (excluding mountain or all-terrain bicycles)")
+# label 14
+sum(product_Canada == "HC-NEISS > Household Items > Electrical power bars")
+```
+ [1] ""                                                                                                             
+ [2] "HC-NEISS > Miscellaneous > other products/other department"                                                   
+ [3] "HC-NEISS > Household Items > other household items"                                                           
+ [4] "HC-NEISS > Household Items > appliances - small"                                                              
+ [5] "HC-NEISS > Modifiers > Second Hand"                                                                           
+ [6] "HC-NEISS > Miscellaneous > other second-hand products"                                                        
+ [7] "HC-NEISS > Household Items > appliances - large"                                                              
+ [8] "HC-NEISS > Childcare > other childcare items"                                                                 
+ [9] "HC-NEISS > Miscellaneous > Vaping Device"                                                                     
+[10] "HC-NEISS > Chemicals > Marine chemicals (excluding antifreeze, lubricants, waxes and windshield wiper fluids)"
+[11] "HC-NEISS > Household Textiles > other household textile items"                                                
+[12] "HC-NEISS > Chemicals > cleaners - wood, incl bleaches"                                                        
+[13] "HC-NEISS > Sports/Leisure > Bicycles or accessories (excluding mountain or all-terrain bicycles)"             
+[14] "HC-NEISS > Household Items > Electrical power bars"  
+
+
+
+
+
+The vast majority of missing coded observations come from the absence of a incident product (a.k.a "").
+
+
+Product with missing numerical code:
+
+1. ""
+
+  - No product, there is no equivalent label in the NEISS manual
+  - Suggest use 0000 instead
+
+2. "HC-NEISS > Miscellaneous > other products/other department"
+
+  - 0100 deleted, coding manual name "Miscellaneous products"
+
+3. "HC-NEISS > Household Items > other household items"
+
+  - 0100 deleted, Coding manual name "General household appliances"
+  - many label related to household is cleaner
+
+4. "HC-NEISS > Household Items > appliances - small"
+
+  - 0100 deleted, Coding manual name "General household appliances"
+  - 0482, Appliances, other or not specified
+  - 5020, Pretend electronics, tools, housewares, and appliances
+
+5. "HC-NEISS > Modifiers > Second Hand"
+
+  - None
+
+
+6. "HC-NEISS > Miscellaneous > other second-hand products"
+
+  - 0100 deleted, coding manual name "Miscellaneous products"
+
+
+7. "HC-NEISS > Household Items > appliances - large"
+
+  - 0100 deleted, Coding manual name "General household appliances"
+  - 0482, Appliances, other or not specified
+  - 5020, Pretend electronics, tools, housewares, and appliances
+
+
+
+8. "HC-NEISS > Childcare > other childcare items"
+
+  - 1500 deleted, Child nursery equipment and supplies
+
+
+9. "HC-NEISS > Miscellaneous > Vaping Device"
+  
+  - 0305, Vaporizers
+
+
+10. "HC-NEISS > Chemicals > Marine chemicals (excluding antifreeze, lubricants, waxes and windshield wiper fluids)"
+
+  - 0921, Chemicals, not elsewhere classified
+
+
+
+11. "HC-NEISS > Household Textiles > other household textile items"
+  
+  - 0666, Towels or cloths Also consider: Fabrics
+  - 4045, Fabrics (not part of finished item)
+  
+12. "HC-NEISS > Chemicals > cleaners - wood, incl bleaches"
+
+  - 0956, Bleaches, non-cosmetic
+  - 1294, Bleachers
+  - 0954, General-purpose household cleaners (excl. abrasives, ammonia, pine oil and toilet bowl products)
+  
+13. "HC-NEISS > Sports/Leisure > Bicycles or accessories (excluding mountain or all-terrain bicycles)"
+
+  - 5040, Bicycles or accessories (excluding mountain or all-terrain bicycles)
+  
+14. "HC-NEISS > Household Items > Electrical power bars"  
+  
+  - 4083, Surge suppressors or power strips
+  
+
+
+
+
+0000 - No product Reported
+0001 - Product NOS
+0002 - Product not from NEISS
+
+0482 - Appliances, other or not specified - NEISS Coding Manual
+1500 - Child nursery equipment and supplies  - NEISS Coding Manual
+0921 - Chemicals, not elsewhere classified  - NEISS Coding Manual
+4045 - Fabrics (not part of finished item)
+0954 - General-purpose household cleaners (excl. abrasives, ammonia, pine oil and toilet bowl products) 
+5040 - Bicycles or accessories (excluding mountain or all-terrain bicycles)  - NEISS Coding Manual
+4083 - Surge suppressors or power strips
+
+assign new labels
+```{r}
+# Without number code 1
+product_Canada[product_Canada == ""] = paste("", "(0000)")
+# Without number code 2
+product_Canada[product_Canada ==  "HC-NEISS > Miscellaneous > other products/other department"] = paste( "HC-NEISS > Miscellaneous > other products/other department", "(0001)")
+
+# Without number code 3
+product_Canada[product_Canada == "HC-NEISS > Household Items > other household items"] = paste("HC-NEISS > Household Items > other household items", "(0482)")
+
+# Without number code 4
+product_Canada[product_Canada == "HC-NEISS > Household Items > appliances - small"] = paste("HC-NEISS > Household Items > appliances - small", "(0482)")
+
+# Without number code 5
+product_Canada[product_Canada == "HC-NEISS > Modifiers > Second Hand"] = paste("HC-NEISS > Modifiers > Second Hand", "(0001)")
+
+# Without number code 6
+product_Canada[product_Canada == "HC-NEISS > Miscellaneous > other second-hand products" ] = paste("HC-NEISS > Miscellaneous > other second-hand products" , "(0001)")
+
+# Without number code 7
+product_Canada[product_Canada ==  "HC-NEISS > Household Items > appliances - large"] = paste( "HC-NEISS > Household Items > appliances - large", "(0482)")
+
+# Without number code 8
+product_Canada[product_Canada == "HC-NEISS > Childcare > other childcare items"] = paste("HC-NEISS > Childcare > other childcare items", "(1500)")
+
+# Without number code 9
+product_Canada[product_Canada == "HC-NEISS > Miscellaneous > Vaping Device" ] = paste("HC-NEISS > Miscellaneous > Vaping Device" , "(0002)")
+
+# Without number code 10
+product_Canada[product_Canada == "HC-NEISS > Chemicals > Marine chemicals (excluding antifreeze, lubricants, waxes and windshield wiper fluids)"] = paste("HC-NEISS > Chemicals > Marine chemicals (excluding antifreeze, lubricants, waxes and windshield wiper fluids)", "(0921)")
+
+# Without number code 11
+product_Canada[product_Canada == "HC-NEISS > Household Textiles > other household textile items"] = paste("HC-NEISS > Household Textiles > other household textile items", "(4045)")
+
+# Without number code 12
+product_Canada[product_Canada == "HC-NEISS > Chemicals > cleaners - wood, incl bleaches"] = paste("HC-NEISS > Chemicals > cleaners - wood, incl bleaches", "(0954)")
+
+
+# Without number code 13
+product_Canada[product_Canada == "HC-NEISS > Sports/Leisure > Bicycles or accessories (excluding mountain or all-terrain bicycles)"] = paste("HC-NEISS > Sports/Leisure > Bicycles or accessories (excluding mountain or all-terrain bicycles)", "(5040)")
+
+
+# Without number code 14
+product_Canada[product_Canada == "HC-NEISS > Household Items > Electrical power bars"] = paste("HC-NEISS > Household Items > Electrical power bars", "(4083)")
+
+# length before reg
+length(product_Canada)
+
+# length after reg
+r = regexpr("([0-9]+)", product_Canada)
+length((regmatches(product_Canada,r)))
+
+# new column
+Canada$Product_Code = regmatches(product_Canada,r)
+```
+
+
+
+###### Result Check:
+
+```{r, echo=FALSE}
+# CH
+print("CH:")
+c("Number of product",length(CH$Product_Code))
+c("Number of Unique product", length(unique(CH$Product_Code)))
+
+# Canada
+print("Canada:")
+c("Number of product",length(Canada$Product_Code))
+c("Number of Unique product", length(unique(Canada$Product_Code)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+
+##### Narrative (Checked)
+################################################################################# Narrative #################################################################################
+
+Feature summary:
+
+```{r, echo=FALSE}
+# CH
+print("CH:")
+c("Number of Narrative",length(CH$INCIDENT.DESCRIPTION))
+c("Number of Unique Narrative", length(unique(CH$INCIDENT.DESCRIPTION)))
+print("")
+
+# Canada
+print("Canada:")
+c("Number of Narrative",length(Canada$Incident.Description))
+c("Number of Unique Narrative", length(unique(Canada$Incident.Description)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+
+for Clearing House Data set:
+
+- Number of narrative is: 194474    
+- Number of Unique narrative is: 193761         
+
+for Canada data set:
+
+- Number of narrative is:20221     
+- Number of Unique narrative is: 19519
+
+
+
+###### Search for missing value in Clearing House Narrative:
+
+```{r, echo=TRUE}
+narrative_CH = unique(unique(CH$INCIDENT.DESCRIPTION))
+#narrative_CH[nchar(narrative_CH)>=30 & nchar(narrative_CH)<35]
+```
+
+- [REDACTED]: sensitive information has been removed.
+- for text less than 40 character, there is no Missing narrative in Clearing House data set.
+
+
+
+
+
+###### For Canada data set:
+
+```{r, echo=FALSE}
+narrative_Canada = Canada$Incident.Description
+#unique(narrative_Canada[nchar(narrative_Canada)>=40 & nchar(narrative_Canada)<45])
+```
+
+"Canadian Incident Please see attachment. “
+
+`Missing value` can be represent as:
+60
+
+
+##### Creating new variable:
+```{r}
+CH$Description = CH$INCIDENT.DESCRIPTION
+Canada$Description = Canada$Incident.Description
+# Missing Value [MT]:
+Canada[is.na(Canada$Description),]$Description = "[MT]"
+Canada[Canada$Description == "N/A",]$Description = "[MT]"
+Canada[Canada$Description == "unknown",]$Description = "[MT]"
+Canada[Canada$Description == "None.",]$Description = "[MT]"
+Canada[Canada$Description == "NONE",]$Description = "[MT]"
+Canada[Canada$Description == "none",]$Description = "[MT]"
+Canada[Canada$Description == "No ",]$Description = "[MT]"
+Canada[Canada$Description == "AUCUN ",]$Description = "[MT]"
+Canada[Canada$Description == "Not applicable.",]$Description = "[MT]"
+Canada[Canada$Description == "non-applicable",]$Description = "[MT]"
+Canada[Canada$Description == "Not Applicable",]$Description = "[MT]"
+Canada[Canada$Description == "Not provided/Non fourni",]$Description = "[MT]"
+Canada[Canada$Description == "étiquette inadequate",]$Description = "[MT]"
+Canada[Canada$Description == "we dont have a incident data ",]$Description = "[MT]"
+Canada[Canada$Description == "Non-compliant label - see images attached",]$Description = "[MT]"
+
+## Outside Source Required [OS]:
+Canada[Canada$Description == "see coroner report." ,]$Description = "[OS]"
+Canada[Canada$Description == "See attachment." ,]$Description = "[OS]"
+Canada[Canada$Description == "See section 4.",]$Description = "[OS]"
+Canada[Canada$Description == "see attach",]$Description = "[OS]"
+Canada[Canada$Description == "See Attached. ",]$Description = "[OS]"
+Canada[Canada$Description == "See Attachment",]$Description = "[OS]"
+Canada[Canada$Description == "See attachment",]$Description = "[OS]"
+Canada[Canada$Description == "See attached.",]$Description = "[OS]"
+Canada[Canada$Description == "Voir rapport fourni",]$Description = "[OS]"
+Canada[Canada$Description == "See Schedule A",]$Description = "[OS]"
+Canada[Canada$Description == "See initial report.",]$Description = "[OS]"
+Canada[Canada$Description == "Please see attachment ",]$Description = "[OS]"
+Canada[Canada$Description == "See below for details",]$Description = "[OS]"
+Canada[Canada$Description == "See attached document. ",]$Description = "[OS]"
+Canada[Canada$Description == "Please see attached report.",]$Description = "[OS]"
+Canada[Canada$Description == "Please see attached report",]$Description = "[OS]"
+Canada[Canada$Description == "See attached incident report",]$Description = "[OS]"
+Canada[Canada$Description == "Please see attached letter.",]$Description = "[OS]"
+Canada[Canada$Description == "See description in section 4.",]$Description = "[OS]"
+Canada[Canada$Description == "Please see attached Word Document.",]$Description = "[OS]"
+Canada[Canada$Description == "See the attached correspondence.",]$Description = "[OS]"
+Canada[Canada$Description == "See the attached correspondence.  ",]$Description = "[OS]"
+Canada[Canada$Description == "Please see the initial submission.",]$Description = "[OS]"
+Canada[Canada$Description == "Please see attached Appendix A.",]$Description = "[OS]"
+Canada[Canada$Description == "Voir rapport d'incident consommateur",]$Description = "[OS]"
+Canada[Canada$Description == "Please see attached letter and report.",]$Description = "[OS]"
+Canada[Canada$Description == "See Attachment \"Section 3 - Incident\"",]$Description = "[OS]"
+Canada[Canada$Description == "See attached copy of email to <redacted>",]$Description = "[OS]"
+Canada[Canada$Description == "See ATTACHMENT A (Section 3) for details.",]$Description = "[OS]"
+Canada[Canada$Description == " See ATTACHMENT A (Section 3) for details.  ",]$Description = "[OS]"
+Canada[Canada$Description == "Canadian Incident  Please see attachment. ",]$Description = "[OS]"
+Canada[Canada$Description == "See Attachment A (Section 3) for details.",]$Description = "[OS]"
+
+## Check number of [MT] & [OS]:
+length(Canada[Canada$Description == "[MT]",]$Description)
+length(Canada[Canada$Description == "[OS]",]$Description)
+```
+
+
+
+#### Result Check
+```{r}
+# CH
+print("CH:")
+c("Number of Narrative",length(CH$Description))
+c("Number of Unique Narrative", length(unique(CH$Description)))
+print("")
+
+# Canada
+print("Canada:")
+c("Number of Narrative",length(Canada$Description))
+c("Number of Unique Narrative", length(unique(Canada$Description)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+
+
+##### Severity (Checked)
+################################################################################# Severity #################################################################################
+
+```{r, echo=FALSE, include=FALSE}
+# CH
+print("CH:")
+c("Number of Severity",length(CH$VICTIM.1.SEVERITY))
+c("Number of Unique Severity", length(unique(CH$VICTIM.1.SEVERITY)))
+print("")
+
+# Canada
+print("Canada:")
+c("Number of Severity",length(Canada$Injury.Severity))
+c("Number of Unique Severity", length(unique(Canada$Injury.Severity)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+
+for Clearing House Data set:
+
+- Number of severity is: 194474    
+- Number of Unique severity is: 11         
+
+for Canada data set:
+
+- Number of severity is:20221     
+- Number of Unique severity is: 8
+
+
+###### In clearing house, severity label includes:
+
+```{r}
+unique(CH$VICTIM.1.SEVERITY)
+```
+
+reconciliation for clearing House:
+
+```{r}
+## Check missing value
+paste("Missing value",sum(is.na(CH$VICTIM.1.SEVERITY)))
+
+
+## Initialize
+CH$SEVERITY = NA
+
+## Re-classification
+
+  # Fatality
+CH[CH$VICTIM.1.SEVERITY == "Death" ,]$SEVERITY = "Fatality"
+
+  # Hospitalization
+CH[CH$VICTIM.1.SEVERITY == "Hospital Admission" ,]$SEVERITY = "Hospitalization" 
+
+  # Injury Requiring Medical Attention
+CH[CH$VICTIM.1.SEVERITY == "Emergency Department Treatment Received" ,]$SEVERITY = "Injury Requiring Medical Attention"
+CH[CH$VICTIM.1.SEVERITY == "Seen by Medical Professional" ,]$SEVERITY = "Injury Requiring Medical Attention"
+
+  # First Aid only 
+CH[CH$VICTIM.1.SEVERITY == "First Aid Received by Non-Medical Professional" ,]$SEVERITY = "First Aid only"
+
+  # Less than First Aid
+CH[CH$VICTIM.1.SEVERITY == "No First Aid or Medical Attention Received" ,]$SEVERITY = "Less than First Aid"
+
+
+
+  # No injury
+CH[CH$VICTIM.1.SEVERITY == "Incident  No Injury" ,]$SEVERITY = "No Injury"
+CH[CH$VICTIM.1.SEVERITY == "No Incident  No Injury" ,]$SEVERITY = "No Injury"                           #Assign "No Injury" for "No Incident, No Injury".
+  
+  # Unknown
+CH[CH$VICTIM.1.SEVERITY == "Level of care not known" ,]$SEVERITY = "Unknown"
+CH[CH$VICTIM.1.SEVERITY == "Unspecified" ,]$SEVERITY = "Unknown"
+CH[CH$VICTIM.1.SEVERITY == "" ,]$SEVERITY = "Unknown"
+
+
+## Check again
+paste("Missing value after relabel",sum(is.na(CH$SEVERITY)))
+
+## New Label
+unique(CH$SEVERITY)
+```
+
+
+
+
+###### In Canada, severity label includes:
+
+```{r}
+unique(Canada$Injury.Severity)
+unique(Canada$Treatment)
+```
+"Incident > Injury Severity > No Injury"                    
+""                                                          
+"Incident > Injury Severity > Unknown"                      
+"Incident > Injury Severity > Minor"                        
+"Incident > Injury Severity > Moderate"                     
+"Incident > Injury Severity > Severe"                       
+"Incident > Injury Severity > Life threatening or disabling"
+"Incident > Injury Severity > Fatal" 
+
+"Incident > Treatment > No Injury - no treatment"           
+""                                                          
+"Incident > Treatment > Unknown"                            
+"Incident > Treatment > First Aid"                          
+"Incident > Treatment > Injury - no treatment"              
+"Incident > Treatment > Hospital - Emergency Room"          
+"Incident > Treatment > Family Doctor"                      
+"Incident > Treatment > Hospital - Admission"               
+"Incident > Treatment > Poison Control"                     
+"Incident > Treatment > Other Medical Professional"         
+"Incident > Treatment > Provincial Health Care Info Service"
+reconciliation for Canada:
+
+```{r}
+## Check missing value in Severity
+sum(is.na(Canada$Injury.Severity))
+
+## Check missing value in Treatment
+sum(is.na(Canada$Treatment))
+
+## Initialize
+Canada$SEVERITY = NA
+
+  # 1 Fatality
+Canada[Canada$Injury.Severity == "Incident > Injury Severity > Fatal",]$SEVERITY = "Fatality"
+
+
+  # Hospitalization
+Canada[(Canada$Injury.Severity != "Incident > Injury Severity > Fatal") & (Canada$Treatment == "Incident > Treatment > Hospital - Admission"),]$SEVERITY = "Hospitalization"
+
+
+  # Injury Requiring Medical Attention
+Canada[(Canada$Injury.Severity == "Incident > Injury Severity > Life threatening or disabling") &  (Canada$Treatment != "Incident > Treatment > Hospital - Admission"),]$SEVERITY = "Injury Requiring Medical Attention"
+
+Canada[(Canada$Injury.Severity == "Incident > Injury Severity > Moderate") & (Canada$Treatment != "Incident > Treatment > Hospital - Admission"),]$SEVERITY = "Injury Requiring Medical Attention"
+
+Canada[Canada$Injury.Severity == "Incident > Injury Severity > Severe" & (Canada$Treatment != "Incident > Treatment > Hospital - Admission"),]$SEVERITY = "Injury Requiring Medical Attention"
+
+Canada[(Canada$Injury.Severity == "Incident > Injury Severity > Minor") & ((Canada$Treatment == "Incident > Treatment > Hospital - Emergency Room")| (Canada$Treatment == "Incident > Treatment > Other Medical Professional")|(Canada$Treatment == "Incident > Treatment > Family Doctor")),]$SEVERITY = "Injury Requiring Medical Attention"
+
+  # First Aid only
+Canada[(Canada$Injury.Severity != "Incident > Injury Severity > Fatal") & (Canada$Injury.Severity != "Incident > Injury Severity > Life threatening or disabling") & (Canada$Injury.Severity != "Incident > Injury Severity > Severe") & (Canada$Injury.Severity != "Incident > Injury Severity > Moderate") & (Canada$Treatment == "Incident > Treatment > First Aid" ),]$SEVERITY = "First Aid only"
+
+
+  # Less than  First Aid
+Canada[(Canada$Injury.Severity == "Incident > Injury Severity > Minor" |  Canada$Injury.Severity == "Incident > Injury Severity > No Injury" | Canada$Injury.Severity == "Incident > Injury Severity > Unknown") & (Canada$Treatment == "Incident > Treatment > Injury - no treatment" | Canada$Treatment == "Incident > Treatment > Poison Control" | Canada$Treatment ==  "Incident > Treatment > Provincial Health Care Info Service"),]$SEVERITY = "Less than  First Aid"
+
+Canada[Canada$Injury.Severity == "Incident > Injury Severity > Minor" & (Canada$Treatment == "Incident > Treatment > No Injury - no treatment" | Canada$Treatment == "" | Canada$Treatment == "Incident > Treatment > Unknown"),]$SEVERITY = "Less than  First Aid"
+
+  # No Injury
+Canada[Canada$Injury.Severity == "Incident > Injury Severity > No Injury" & Canada$Treatment == "Incident > Treatment > No Injury - no treatment",]$SEVERITY = "No Injury"
+
+Canada[Canada$Injury.Severity == "Incident > Injury Severity > No Injury" & (Canada$Treatment == "" | Canada$Treatment == "Incident > Treatment > Unknown" | Canada$Treatment == "Incident > Treatment > Hospital - Emergency Room" | Canada$Treatment == "Incident > Treatment > Family Doctor" | Canada$Treatment == "Incident > Treatment > Other Medical Professional"),]$SEVERITY = "No Injury"
+
+  # Unknown
+Canada[Canada$Injury.Severity == "Incident > Injury Severity > Unknown" & Canada$Treatment != "Incident > Treatment > Hospital - Admission"  & Canada$Treatment != "Incident > Treatment > First Aid" & Canada$Treatment != "Incident > Treatment > Injury - no treatment" & Canada$Treatment != "Incident > Treatment > Poison Control" & Canada$Treatment != "Incident > Treatment > Provincial Health Care Info Service",]$SEVERITY = "Unknown"
+
+Canada[Canada$Injury.Severity == "" & Canada$Treatment != "Incident > Treatment > Hospital - Admission"  & Canada$Treatment != "Incident > Treatment > First Aid",]$SEVERITY = "Unknown"
+
+## Check again
+sum(is.na(Canada$SEVERITY))
+
+## New labels
+unique(Canada$SEVERITY)
+```
+
+
+
+
+Summary of New Variable
+```{r}
+tab1(CH$SEVERITY, sort.group = "decreasing", cum.percent = TRUE,graph = TRUE)
+tab1(Canada$SEVERITY, sort.group = "decreasing", cum.percent = TRUE,graph = TRUE)
+```
+
+Interesting Observations:
+
+
+- In CH, Fatality has the highest population
+- In Canada, Fatality has the lowest population
+
+
+```{r}
+# CH
+print("CH:")
+c("Number of Severity",length(CH$SEVERITY))
+c("Number of Unique Severity", length(unique(CH$SEVERITY)))
+print("")
+
+# Canada
+print("Canada:")
+c("Number of Severity",length(Canada$SEVERITY))
+c("Number of Unique Severity", length(unique(Canada$SEVERITY)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+
+
+##### Hazard (Checked)
+################################################################################# Hazard #################################################################################
+
+Feature Summary:
+
+```{r, echo=FALSE, include=FALSE}
+# CH
+print("CH:")
+c("Number of hazard",length(CH$PRODUCT.1.HAZARD))
+c("Number of Unique hazard", length(unique(CH$PRODUCT.1.HAZARD)))
+print("")
+
+# Canada
+print("Canada:")
+c("Number of hazard",length(Canada$Hazard.1))
+c("Number of Unique hazard", length(unique(Canada$Hazard.1)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+
+for Clearing House Data set:
+
+- Number of Hazard is: 194474    
+- Number of Unique Hazard is: 37         
+
+for Canada data set:
+
+- Number of Hazard is:20221     
+- Number of Unique Hazard is: 55
+
+
+###### For Clearing House
+
+The Unique labels for Hazard in Clearing house are:
+
+```{r}
+#unique(CH$PRODUCT.1.HAZARD)
+```
+
+We will assign them to 15 new labels:
+
+```{r}
+## Initialize
+CH$Hazard = NA
+
+## Toxic Substance
+CH[CH$PRODUCT.1.HAZARD == "Chemical - Poisoning - Carbon Monoxide",]$Hazard = "Toxic Substance"
+CH[CH$PRODUCT.1.HAZARD == "Chemical - Poisoning - Heavy Metals (Lead)",]$Hazard = "Toxic Substance"
+CH[CH$PRODUCT.1.HAZARD == "Chemical - Poisoning - Heavy Metals (Other than Lead)",]$Hazard = "Toxic Substance"
+CH[CH$PRODUCT.1.HAZARD == "Chemical - Poisoning - Other Gases/Vapors",]$Hazard = "Toxic Substance"
+CH[CH$PRODUCT.1.HAZARD == "Chemical - Poisoning - Other Liquid/Solid",]$Hazard = "Toxic Substance"
+
+## Electrical
+CH[CH$PRODUCT.1.HAZARD == "Electrical",]$Hazard = "Electrical"
+CH[CH$PRODUCT.1.HAZARD == "Electrical - Electric shock/Electrocution",]$Hazard = "Electrical"
+CH[CH$PRODUCT.1.HAZARD == "Electrical - Other Electrical malfunction",]$Hazard = "Electrical"
+CH[CH$PRODUCT.1.HAZARD == "Electrical - Water leaking",]$Hazard = "Electrical"
+
+
+## Crushing/Pinching
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Crushing/Pinching",]$Hazard = "Crushing/Pinching"
+
+## Entanglement/Entrapment
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Entanglement/Entrapment",]$Hazard ="Entanglement/Entrapment"
+
+## Explosion
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Explosion (pressure related)",]$Hazard = "Explosion"
+
+## Slip/Fall
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Fall",]$Hazard = "Slip/Fall"
+
+## Sharp/Pointed Object
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Sharp or Pointed Objects",]$Hazard = "Sharp/Pointed Object"
+
+## Small Part
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Small Parts",]$Hazard = "Small Part"
+
+## Struck By/Against
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Projectile/Falling Objects",]$Hazard = "Struck By/Against"
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Struck by",]$Hazard = "Struck By/Against"
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Collision",]$Hazard = "Struck By/Against"
+
+## Asphyxiation
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Threat to Breathing",]$Hazard = "Asphyxiation"
+
+## Tip Over / Instability
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Tip Over / Instability / Rollover",]$Hazard = "Tip Over / Instability"
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Tip Over/Instability/Rollover",]$Hazard = "Tip Over / Instability"
+
+## Mechanical-Other
+CH[CH$PRODUCT.1.HAZARD == "Mechanical",]$Hazard = "Mechanical-Other"
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Malfunctioning safety equipment",]$Hazard = "Mechanical-Other"
+CH[CH$PRODUCT.1.HAZARD == "Mechanical - Submersion",]$Hazard = "Mechanical-Other"
+
+## Thermal-Fire
+CH[CH$PRODUCT.1.HAZARD == "Thermal - Fire",]$Hazard = "Thermal-Fire"
+
+## Thermal-Other
+CH[CH$PRODUCT.1.HAZARD == "Thermal",]$Hazard = "Thermal-Other"
+CH[CH$PRODUCT.1.HAZARD == "Thermal - Extreme Cold",]$Hazard = "Thermal-Other"
+CH[CH$PRODUCT.1.HAZARD == "Thermal - Flammable liquids  gases & vapors",]$Hazard = "Thermal-Other"
+CH[CH$PRODUCT.1.HAZARD == "Thermal - Hot Liquid or Steam",]$Hazard = "Thermal-Other"
+CH[CH$PRODUCT.1.HAZARD == "Thermal - Hot surface",]$Hazard = "Thermal-Other"
+CH[CH$PRODUCT.1.HAZARD == "Thermal - Other Flammable materials" ,]$Hazard = "Thermal-Other"
+
+## Other
+CH[CH$PRODUCT.1.HAZARD == "Other",]$Hazard = "Other"
+CH[CH$PRODUCT.1.HAZARD == "Chemical",]$Hazard = "Other"
+CH[CH$PRODUCT.1.HAZARD == "Chemical - Allergenic",]$Hazard = "Other"
+CH[CH$PRODUCT.1.HAZARD == "Chemical - Caustic/Corrosive",]$Hazard = "Other"
+CH[CH$PRODUCT.1.HAZARD == "Chemical - Particulates",]$Hazard = "Other"
+
+## Missing
+CH[CH$PRODUCT.1.HAZARD == "",]$Hazard = ""
+```
+Done
+
+
+
+###### For Canada
+
+```{r}
+# unique(Canada$Hazard.1)
+
+## Initialize
+Canada$Hazard = NA
+
+
+## Toxic Substance
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Toxicological",]$Hazard = "Toxic Substance"
+
+## Electrical
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Electrical > Electrical, unknown",]$Hazard = "Electrical"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Electrical",]$Hazard = "Electrical"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Electrical > Arcing or sparking",]$Hazard = "Electrical"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Electrical > Short circuit",]$Hazard = "Electrical"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Electrical > Exposed wiring",]$Hazard = "Electrical"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Electrical > Overload",]$Hazard = "Electrical"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Electrical > Tripping of (safety device)",]$Hazard = "Electrical"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Electrical > Loose connection",]$Hazard = "Electrical"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Electrical > Excessive heat",]$Hazard = "Electrical"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Electrical > Electrical, other",]$Hazard = "Electrical"
+
+## Crushing/Pinching
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Pinch or shear",]$Hazard = "Crushing/Pinching"
+
+## Entanglement/Entrapment
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Entrapment",]$Hazard = "Entanglement/Entrapment"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Entanglement",]$Hazard = "Entanglement/Entrapment"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Confinement",]$Hazard = "Entanglement/Entrapment"
+
+## Explosion
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Explosion",]$Hazard = "Explosion"
+
+## Slip/Fall
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Fall",]$Hazard = "Slip/Fall"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Slippery surface",]$Hazard = "Slip/Fall"
+
+
+## Sharp/Pointed Object
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Sharp edge or point",]$Hazard = "Sharp/Pointed Object"
+
+
+## Small Part
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Broken Part",]$Hazard = "Small Part"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Small part",]$Hazard = "Small Part"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Detached Part",]$Hazard = "Small Part"
+
+
+## Struck By/Against
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Struck by or against",]$Hazard = "Struck By/Against"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Impaction",]$Hazard = "Struck By/Against"
+
+
+## Asphyxiation
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Impermeable to air",]$Hazard = "Asphyxiation"
+
+
+## Tip Over / Instability
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Instability",]$Hazard = "Tip Over / Instability"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Tip over",]$Hazard = "Tip Over / Instability"
+
+## Mechanical-Other
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical",]$Hazard = "Mechanical-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Mechanical and physical, other",]$Hazard = "Mechanical-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Collapse",]$Hazard = "Mechanical-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Leak (due to mechanical failure)",]$Hazard = "Mechanical-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Moving part",]$Hazard = "Mechanical-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Mechanical and physical, unknown",]$Hazard = "Mechanical-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Rough surface",]$Hazard = "Mechanical-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Noise",]$Hazard = "Mechanical-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Trip over",]$Hazard = "Mechanical-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Suction",]$Hazard = "Mechanical-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Lens effect (magnifying)",]$Hazard = "Mechanical-Other"
+ Canada[Canada$Hazard.1 == "Hazard 1: Primary > Mechanical and physical > Expansion",]$Hazard = "Mechanical-Other" 
+
+
+
+## Thermal-Fire
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Flammability > Fire",]$Hazard = "Thermal-Fire"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Flammability > Combustion",]$Hazard = "Thermal-Fire"
+
+
+## Thermal-Other
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Flammability",]$Hazard = "Thermal-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Flammability > Reignition",]$Hazard = "Thermal-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Flammability > Flammability unknown",]$Hazard = "Thermal-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Flammability > Flammability other",]$Hazard = "Thermal-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Flammability > Overheating" ,]$Hazard = "Thermal-Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Flammability > Smoke",]$Hazard = "Thermal-Other"
+
+
+## Other
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Radiation Emitting > Laser",]$Hazard = "Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Radiation Emitting > Radiation, unknown",]$Hazard = "Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Radiation Emitting > Radiation, other",]$Hazard = "Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Radiation Emitting > Microwaves",]$Hazard = "Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Radiation Emitting > Radio waves",]$Hazard = "Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > Radiation Emitting > Light ultraviolet",]$Hazard = "Other"
+Canada[Canada$Hazard.1 == "Hazard 1: Primary > No Hazard",]$Hazard = "Other"
+
+## Missing 
+Canada[Canada$Hazard.1 == "",]$Hazard = ""
+
+sum(is.na(Canada$Hazard))
+```
+```{r}
+# CH
+print("CH:")
+c("Number of hazard",length(CH$Hazard))
+c("Number of Unique hazard", length(unique(CH$Hazard)))
+print("")
+
+# Canada
+print("Canada:")
+c("Number of hazard",length(Canada$Hazard.1))
+c("Number of Unique hazard", length(unique(Canada$Hazard)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+
+
+##### Injury (Checked)
+################################################################################# Injury ######################################################################################
+```{r, echo=FALSE}
+# CH
+print("CH:")
+c("Number of injury",length(CH$VICTIM.1.INJURY))
+c("Number of Unique injury", length(unique(CH$VICTIM.1.INJURY)))
+print("")
+
+# Canada
+print("Canada:")
+c("Number of injury",length(Canada$Injury.Type))
+c("Number of Unique injury", length(unique(Canada$Injury.Type)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+for Clearing House Data set:
+
+- Number of Hazard is: 194474    
+- Number of Unique Hazard is: 32         
+
+for Canada data set:
+
+- Number of Hazard is:20221     
+- Number of Unique Hazard is: 16
+
+
+```{r, echo=FALSE}
+# Unique Injury CH, 32
+# unique(CH$VICTIM.1.INJURY)
+# Unique Injury Canada, 16
+#unique(Canada$Injury.Type)
+```
+
+For Clearing house data set:
+
+```{r}
+## Initialize
+CH$Injury = NA
+
+## Amputation
+CH[CH$VICTIM.1.INJURY == "Amputation",]$Injury = "Amputation"
+
+## Fracture
+CH[CH$VICTIM.1.INJURY == "Break  Fracture",]$Injury = "Fracture"
+  
+## Bruise/Scratch
+CH[CH$VICTIM.1.INJURY == "Bruising  Scratches",]$Injury = "Bruise/Scratch"
+CH[CH$VICTIM.1.INJURY == "Severe Bruising",]$Injury = "Bruise/Scratch"
+
+## Burn
+CH[CH$VICTIM.1.INJURY == "Burn",]$Injury = "Burn"
+CH[CH$VICTIM.1.INJURY == "Burn-Chemical",]$Injury = "Burn"
+CH[CH$VICTIM.1.INJURY == "Burn-Thermal",]$Injury = "Burn"
+CH[CH$VICTIM.1.INJURY == "Burn-Scald",]$Injury = "Burn"
+CH[CH$VICTIM.1.INJURY == "Burn-Electrical",]$Injury = "Burn"
+CH[CH$VICTIM.1.INJURY == "Burn-Radiation",]$Injury = "Burn"
+CH[CH$VICTIM.1.INJURY == "Burn-not specified" ,]$Injury = "Burn"
+
+## Cut
+CH[CH$VICTIM.1.INJURY == "Cut",]$Injury = "Cut"
+  
+## Irritation or Allergic reaction
+CH[CH$VICTIM.1.INJURY == "Dermatitis  Conjunctivitis  Skin or Eye Irritation/Rash",]$Injury = "Irritation or Allergic reaction"
+  
+## Shock
+CH[CH$VICTIM.1.INJURY == "Electric Shock",]$Injury = "Shock"
+  
+## Foreign Object
+CH[CH$VICTIM.1.INJURY == "Foreign Object Stuck in or on the body",]$Injury = "Foreign Object"
+  
+## Asphyxia
+CH[CH$VICTIM.1.INJURY == "Lack of oxygen",]$Injury = "Asphyxia"
+  
+## Poisoning
+CH[CH$VICTIM.1.INJURY == "Poisoning",]$Injury = "Poisoning"
+  
+## Strain/Sprain
+CH[CH$VICTIM.1.INJURY == "Strain / Sprain",]$Injury = "Strain/Sprain"
+  
+## Concussion/Brain Injury
+CH[CH$VICTIM.1.INJURY == "Concussion",]$Injury = "Concussion/Brain Injury"
+  
+## Unknown
+CH[CH$VICTIM.1.INJURY == "Unspecified",]$Injury = "Unknown"
+  
+## Other
+CH[CH$VICTIM.1.INJURY == "Bleeding",]$Injury = "Other"
+CH[CH$VICTIM.1.INJURY == "Dental Injury",]$Injury = "Other"
+CH[CH$VICTIM.1.INJURY == "Dislocation",]$Injury = "Other"
+CH[CH$VICTIM.1.INJURY == "Drowning",]$Injury = "Other"
+CH[CH$VICTIM.1.INJURY == "Internal Organ Injury",]$Injury = "Other"
+CH[CH$VICTIM.1.INJURY == "Nerve Damage",]$Injury = "Other"
+CH[CH$VICTIM.1.INJURY == "Object Inhaled",]$Injury = "Other"
+CH[CH$VICTIM.1.INJURY == "Object swallowed",]$Injury = "Other"
+CH[CH$VICTIM.1.INJURY == "Puncture",]$Injury = "Other"
+CH[CH$VICTIM.1.INJURY == "Skin Tear  Skin Flap  Nail Detachment",]$Injury = "Other"
+CH[CH$VICTIM.1.INJURY == "Other/Not Stated"
+,]$Injury = "Other"
+
+## missing
+CH[CH$VICTIM.1.INJURY == "",]$Injury = ""
+
+sum(is.na(CH$Injury))
+
+```
+
+For Canada data set:
+
+```{r}
+
+## Initialize
+Canada$Injury = NA
+
+## Amputation
+Canada[Canada$Injury.Type == "Incident > Injury Type > Amputation",]$Injury = "Amputation"
+
+## Fracture
+Canada[Canada$Injury.Type == "Incident > Injury Type > Fracture",]$Injury = "Fracture"
+  
+## Bruise/Scratch
+Canada[Canada$Injury.Type == "Incident > Injury Type > Bruising",]$Injury = "Bruise/Scratch"
+  
+## Burn
+Canada[Canada$Injury.Type == "Incident > Injury Type > Burn",]$Injury = "Burn"
+  
+## Cut
+Canada[Canada$Injury.Type == "Incident > Injury Type > Cut",]$Injury = "Cut"
+  
+## Irritation or Allergic reaction
+Canada[Canada$Injury.Type == "Incident > Injury Type > Irritation or Allergic reaction",]$Injury = "Irritation or Allergic reaction"
+  
+## Shock
+Canada[Canada$Injury.Type == "Incident > Injury Type > Electric shock",]$Injury = "Shock"
+  
+## Foreign Object
+Canada[Canada$Injury.Type == "Incident > Injury Type > Foreign body",]$Injury = "Foreign Object"
+  
+## Asphyxia
+Canada[Canada$Injury.Type == "Incident > Injury Type > Asphyxia",]$Injury = "Asphyxia"
+  
+## Poisoning
+Canada[Canada$Injury.Type == "Incident > Injury Type > Poisoning",]$Injury = "Poisoning"
+  
+## Strain/Sprain
+Canada[Canada$Injury.Type == "Incident > Injury Type > Sprain or strain",]$Injury = "Strain/Sprain"
+  
+## Concussion/Brain Injury
+Canada[Canada$Injury.Type == "Incident > Injury Type > Brain injury",]$Injury = "Concussion/Brain Injury"
+  
+## Unknown
+Canada[Canada$Injury.Type == "Incident > Injury Type > No Injury",]$Injury = "Unknown"
+Canada[Canada$Injury.Type == "Incident > Injury Type > Unknown",]$Injury = "Unknown"
+
+## Other
+Canada[Canada$Injury.Type == "Incident > Injury Type > Other",]$Injury = "Other"
+
+## Missing
+Canada[Canada$Injury.Type == "",]$Injury = ""
+
+sum(is.na(Canada$Injury))
+```
+###### Result check:
+```{r}
+# CH
+print("CH:")
+c("Number of injury",length(CH$Injury))
+c("Number of Unique injury", length(unique(CH$Injury)))
+print("")
+
+# Canada
+print("Canada:")
+c("Number of injury",length(Canada$Injury))
+c("Number of Unique injury", length(unique(Canada$Injury)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+
+#### Body Part
+################################################################################# Injury ######################################################################################
+```{r}
+# CH
+print("CH:")
+c("Number of body part",length(CH$VICTIM.1.BODY.PART))
+c("Number of Unique body part", length(unique(CH$VICTIM.1.BODY.PART)))
+print("")
+
+# Canada
+print("Canada:")
+c("Number of body part",length(Canada$Body.Part.1))
+c("Number of Unique body part", length(unique(Canada$Body.Part.1)))
+paste("Dimension in Clearing House", dim(CH))
+paste("Dimension in Canada", dim(Canada))
+```
+
+```{r}
+unique(CH$VICTIM.1.BODY.PART)
+```
+
+
+###### Creating new label:
+
+```{r}
+CH$Body_part = NA
+
+# Head
+CH[CH$VICTIM.1.BODY.PART == "Head",]$Body_part = "Head"
+  
+# Face
+CH[CH$VICTIM.1.BODY.PART == "Face (including eyelid  eye area and nose)"  ,]$Body_part = "Face"
+  
+# Ear
+CH[CH$VICTIM.1.BODY.PART == "Ear",]$Body_part = "Ear"
+  
+# Eyeball
+CH[CH$VICTIM.1.BODY.PART == "Eyeball",]$Body_part = "Eyeball"
+  
+# Mouth
+CH[CH$VICTIM.1.BODY.PART == "Mouth",]$Body_part = "Mouth"
+  
+# Arm
+CH[CH$VICTIM.1.BODY.PART == "Arm",]$Body_part = "Arm"
+  
+# Elbow
+CH[CH$VICTIM.1.BODY.PART == "Elbow",]$Body_part = "Elbow"
+  
+# Hand
+CH[CH$VICTIM.1.BODY.PART == "Hand",]$Body_part = "Hand"
+  
+# Finger
+CH[CH$VICTIM.1.BODY.PART == "Finger",]$Body_part = "Finger"
+  
+# Wrist
+CH[CH$VICTIM.1.BODY.PART == "Wrist",]$Body_part = "Wrist"
+  
+# Trunk
+CH[CH$VICTIM.1.BODY.PART == "Trunk",]$Body_part = "Trunk"
+  
+# Shoulder
+CH[CH$VICTIM.1.BODY.PART == "Shoulder (including clavicle  collarbone)",]$Body_part = "Shoulder"
+  
+# Public Region
+CH[CH$VICTIM.1.BODY.PART == "Pubic Region",]$Body_part = "Public Region"
+  
+# Neck
+CH[CH$VICTIM.1.BODY.PART == "Neck",]$Body_part = "Neck"
+  
+# Leg
+CH[CH$VICTIM.1.BODY.PART == "Leg",]$Body_part = "Leg"
+  
+# Ankle
+CH[CH$VICTIM.1.BODY.PART == "Ankle",]$Body_part = "Ankle"
+  
+# Knee
+CH[CH$VICTIM.1.BODY.PART == "Knee",]$Body_part = "Knee"
+  
+# Foot
+CH[CH$VICTIM.1.BODY.PART == "Foot",]$Body_part = "Foot"
+  
+# Toe
+CH[CH$VICTIM.1.BODY.PART == "Toe",]$Body_part = "Toe"
+  
+# >50% of Body
+CH[CH$VICTIM.1.BODY.PART == "All Parts of the body",]$Body_part = ">50% of Body"
+  
+# 25-50% of Body
+CH[CH$VICTIM.1.BODY.PART == "25-50% of body",]$Body_part = "25-50% of Body"
+  
+# Internal
+CH[CH$VICTIM.1.BODY.PART == "Internal (use with aspiration and ingestion)",]$Body_part = "Internal"
+  
+# Other
+CH[CH$VICTIM.1.BODY.PART == "Unspecified",]$Body_part = "Other"
+CH[CH$VICTIM.1.BODY.PART == "Not Recorded",]$Body_part = "Other"
+  
+# Missing 
+CH[CH$VICTIM.1.BODY.PART == "",]$Body_part = ""
+
+# Check 
+sum(is.na(CH$Body_part))
+```
+
+```{r}
+Canada$Body_part = NA
+
+# Head
+Canada[Canada$Body.Part.1 == "Body Part > Head",]$Body_part = "Head"
+Canada[Canada$Body.Part.1 == "Body Part > Head > Hair",]$Body_part = "Head"
+Canada[Canada$Body.Part.1 == "Body Part > Head > Head/Scalp",]$Body_part = "Head"
+  
+# Face
+Canada[Canada$Body.Part.1 == "Body Part > Face (includes eyelid, eye area and nose)",]$Body_part = "Face"
+Canada[Canada$Body.Part.1 == "Body Part > Head > Face (includes eyelid, eye area and nose)",]$Body_part = "Face"
+  
+# Ear
+Canada[Canada$Body.Part.1 == "Body Part > Head > Ear",]$Body_part = "Ear"
+  
+# Eyeball
+Canada[Canada$Body.Part.1 == "Body Part > Eyeball",]$Body_part = "Eyeball"
+Canada[Canada$Body.Part.1 == "Body Part > Head > Eyeball",]$Body_part = "Eyeball"
+  
+# Mouth
+Canada[Canada$Body.Part.1 == "Body Part > Mouth (including lips, tongue and teeth)",]$Body_part = "Mouth"
+Canada[Canada$Body.Part.1 == "Body Part > Head > Mouth (including lips, tongue and teeth)",]$Body_part = "Mouth"
+
+# Arm
+Canada[Canada$Body.Part.1 == "Body Part > Arm",]$Body_part = "Arm"
+Canada[Canada$Body.Part.1 == "Body Part > Arm > Arm, lower (excludes elbow or wrist)",]$Body_part = "Arm"
+Canada[Canada$Body.Part.1 == "Body Part > Arm, lower (excludes elbow or wrist)",]$Body_part = "Arm"
+Canada[Canada$Body.Part.1 == "Body Part > Arm > Arm, upper",]$Body_part = "Arm"
+  
+# Elbow
+Canada[Canada$Body.Part.1 == "Body Part > Arm > Elbow",]$Body_part = "Elbow"
+  
+# Hand
+Canada[Canada$Body.Part.1 == "Body Part > Arm > Hand",]$Body_part = "Hand"
+Canada[Canada$Body.Part.1 == "Body Part > Hand",]$Body_part = "Hand"
+  
+# Finger
+Canada[Canada$Body.Part.1 == "Body Part > Arm > Finger",]$Body_part = "Finger"
+Canada[Canada$Body.Part.1 == "Body Part > Finger",]$Body_part = "Finger"
+  
+# Wrist
+Canada[Canada$Body.Part.1 == "Body Part > Wrist",]$Body_part = "Wrist"
+Canada[Canada$Body.Part.1 == "Body Part > Arm > Wrist",]$Body_part = "Wrist"
+  
+# Trunk
+Canada[Canada$Body.Part.1 == "Body Part > Trunk",]$Body_part = "Trunk"
+Canada[Canada$Body.Part.1 == "Body Part > Trunk, Upper",]$Body_part = "Trunk"
+Canada[Canada$Body.Part.1 == "Body Part > Trunk > Trunk (upper not including shoulders)",]$Body_part = "Trunk"
+Canada[Canada$Body.Part.1 == "Body Part > Trunk (upper not including shoulders)",]$Body_part = "Trunk"
+Canada[Canada$Body.Part.1 == "Body Part > Trunk, lower",]$Body_part = "Trunk"
+Canada[Canada$Body.Part.1 == "Body Part > Trunk > Trunk, lower",]$Body_part = "Trunk"
+  
+# Shoulder
+Canada[Canada$Body.Part.1 == "Body Part > Trunk > Shoulder (including clavicle or collarbone)",]$Body_part = "Shoulder"
+  
+# Public Region
+Canada[Canada$Body.Part.1 == "Body Part > Pubic region",]$Body_part = "Public Region"
+Canada[Canada$Body.Part.1 == "Body Part > Trunk > Pubic region",]$Body_part = "Public Region"
+  
+# Neck
+Canada[Canada$Body.Part.1 == "Body Part > Neck",]$Body_part = "Neck"
+Canada[Canada$Body.Part.1 == "Body Part > Trunk > Neck",]$Body_part = "Neck"
+  
+# Leg
+Canada[Canada$Body.Part.1 == "Body Part > Leg",]$Body_part = "Leg"
+Canada[Canada$Body.Part.1 == "Body Part > Leg > Leg, Upper",]$Body_part = "Leg"
+Canada[Canada$Body.Part.1 == "Body Part > Leg, Upper",]$Body_part = "Leg"
+Canada[Canada$Body.Part.1 == "Body Part > Leg > Leg, lower (excludes knee or ankle)",]$Body_part = "Leg"
+Canada[Canada$Body.Part.1 == "Body Part > Leg, lower (excludes knee or ankle)",]$Body_part = "Leg"
+  
+# Ankle
+Canada[Canada$Body.Part.1 == "Body Part > Leg > Ankle",]$Body_part = "Ankle"
+  
+# Knee
+Canada[Canada$Body.Part.1 == "Body Part > Leg > Knee",]$Body_part = "Knee"
+  
+# Foot
+Canada[Canada$Body.Part.1 == "Body Part > Leg > Foot",]$Body_part = "Foot"
+Canada[Canada$Body.Part.1 == "Body Part > Foot",]$Body_part = "Foot"
+  
+# Toe
+Canada[Canada$Body.Part.1 == "Body Part > Leg > Toe",]$Body_part = "Toe"
+  
+# >50% of Body
+Canada[Canada$Body.Part.1 == "Body Part > All parts of body (more than 50% of body)",]$Body_part = ">50% of Body"
+  
+# 25-50% of Body
+Canada[Canada$Body.Part.1 == "Body Part > 25-50% of body",]$Body_part = "25-50% of Body"
+  
+# Internal
+Canada[Canada$Body.Part.1 == "Body Part > Internal",]$Body_part = "Internal"
+  
+# Other
+Canada[Canada$Body.Part.1 == "Body Part > Internal",]$Body_part = "Other"
+Canada[Canada$Body.Part.1 == "Body Part > No Injury",]$Body_part = "Other"
+Canada[Canada$Body.Part.1 == "Body Part > Not recorded",]$Body_part = "Other"
+# Missing
+Canada[Canada$Body.Part.1 == "",]$Body_part = ""
+
+# Check 
+sum(is.na(Canada$Body_part))
+```
+```{r}
+Canada[is.na(Canada$Body_part),]$Body.Part.1
+```
+
+################################################################################################################################################################################
+
+```{r}
+dim(Canada)
+dim(CH)
+colnames(Canada)
+```
+```{r}
+Canada_nv = Canada %>% dplyr::select(Product_Code, SEVERITY, Hazard, Injury, Body_part, Description)
+CH_nv = CH %>% dplyr::select(Product_Code, SEVERITY, Hazard, Injury, Body_part, Description)
+```
+
+```{r}
+library(dplyr)
+USCA_inner = rbind(Canada_nv,CH_nv)
+USCA_outer = merge(x=Canada,y=CH,all=TRUE)
+```
+
+
+
+```{r,echo=FALSE, include=FALSE}
+# write out file
+library(readr)
+
+#write_csv(CH, "C:\\Users\\28783\\OneDrive - Underwriters Laboratories\\Desktop\\Clearing_House.csv")
+library(data.table)
+
+fwrite(USCA_inner, "C:\\Users\\28783\\OneDrive - Underwriters Laboratories\\Desktop\\USCA_inner.csv")
+fwrite(USCA_outer, "C:\\Users\\28783\\OneDrive - Underwriters Laboratories\\Desktop\\USCA_outer.csv")
+```
+
